@@ -22,8 +22,13 @@ services:
     container_name: local-registry
     volumes:
       - registry_data:/var/lib/registry
+      - ./certs:/certs
     ports:
-      - "5000:5000"
+      - "5000:443"
+    environment:
+      REGISTRY_HTTP_ADDR: "0.0.0.0:443"
+      REGISTRY_HTTP_TLS_CERTIFICATE: "/certs/registry.crt"
+      REGISTRY_HTTP_TLS_KEY: "/certs/registry.key"
     restart: always
 
 volumes:
