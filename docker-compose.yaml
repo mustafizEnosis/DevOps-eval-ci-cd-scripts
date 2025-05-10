@@ -2,25 +2,26 @@ services:
   jenkins:
     image: jenkins/jenkins:lts-jdk17
     container_name: jenkins
+    privileged: true
+    user: root
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
-    networks:
-      - docker-network
     ports:
       - "8080:8080"
       - "50000:50000"
-      - "3000:3000"
     restart: always
+    depends_on:
+      - registry
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   registry:
     image: registry:2
     container_name: local-registry
     volumes:
       - registry_data:/var/lib/registry
-    networks:
-      - docker-network
     ports:
       - "5000:5000"
     restart: always
@@ -28,6 +29,3 @@ services:
 volumes:
   jenkins_home:
   registry_data:
-
-networks:
-  docker-network:
