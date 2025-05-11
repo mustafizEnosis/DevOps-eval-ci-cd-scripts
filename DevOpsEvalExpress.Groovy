@@ -56,6 +56,9 @@ pipeline {
                     script {
                         echo "Pulling docker image from ${REGISTRY_URL}"
                         sh "docker pull ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
+
+                        def container_id = sh(script: "docker ps --filter \"publish=3000\" --format \"{{.ID}}\"", returnStdout: true).trim()
+                        sh "docker stop ${container_id}"
                         
                         sh "docker run -d -p 3000:8080 ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
                         
