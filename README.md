@@ -60,8 +60,11 @@
     - Remove the local Docker built image using the below command.
       - `docker rmi localhost:5000/<IMAGE_NAME>:<COMMIT_SHA>`
   4. Deploy:
-    - Pull the image from the local registry
+    - Pull the image from the local registry.
       - `docker pull localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
+    - Get the container ID of the currently deployed one and stop that.
+      - `def container_id = sh(script: "docker ps --filter \"publish=3000\" --format \"{{.ID}}\"", returnStdout: true).trim()`
+      - `docker stop ${container_id}`    
     - Run the pulled Docker image using the following command to ensure it is running in detached mode and maps the 8080 port to host machine's 3000 port.
       - `docker run -d -p 3000:8080 localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
     - Sleep a little bit to ensure the express server is running within the docker container.
@@ -82,3 +85,22 @@
   - Doing curl on `http://localhost:3000` would actually request the Jenkins container port 3000. However, we ran the Docker image using the docker run command. Since we share the Docker daemon of the host machine, the run command actually mapped the host machine’s port 3000 to the 8080 port of the image. Thus, we need a mechanism to get the host machine’s IP address from the Jenkins container to know whether the deployment is successful or the Docker image is running.
   - In order to access the host machine’s IP address, the extra_hosts key is used in the docker compose under the Jenkins service, and the host_gateway is mapped to host.docker.internal. With host-gateway keyword docker dynamically resolves to the IP address of the gateway of the Docker bridge network on the host machine.
   - Thus, we should curl to http://host.docker.internal:3000 to check whether the deployment is successful.
+
+## Set up automatic build trigger
+- Configure Jenkins job
+  - Select Pipeline script from SCM.
+  - Choose Git as the SCM.
+  - Enter your GitHub repository URL.
+  - Specify the Branch Specifier (*/main).   
+  - Save the job configuration.
+- Install ngrok in the host server machine. Follow this [document](https://ngrok.com/docs/getting-started/?os=linux) to install ngrok.
+- Configure the GitHub Webhook
+  - Go to your GitHub repository.
+  - Click on the Settings tab.
+  - In the left sidebar, click on Webhooks.
+  - Click on the Add webhook button.
+  - Payload URL: Enter your Jenkins server's URL followed by /github-webhook/. For example: https://cosmic-puma-hopeful.ngrok-free.app/github-webhook/
+  - Content type: Choose application/json.
+  - Which events would you like to trigger this webhook? Choose "Just push events".
+  - Ensure the Active checkbox is selected.
+  - Click on the Add webhook button.
