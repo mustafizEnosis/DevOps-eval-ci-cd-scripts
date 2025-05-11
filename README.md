@@ -18,7 +18,6 @@
 - As the Jenkins container is running, go to `http://localhost:8080` and provide the admin password found with the below command.
   - sudo docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 - Install the suggested plugins. Additional plugins can be installed from Manage Jenkins -> Manage plugins
-- Add the NodeJS tools from Manage Jenkins -> Tools -> Add NodeJS. Ensure the tool name is NodeJS,
 - Add GitHub SSH credential: An SSH credential for GitHub is created using this document. Then in Jenkins, go to Manage Jenkins -> Credentials -> (System) Global Domains -> Select SSH Username with private key option and fill data in the fields. Ensure the ID of the credential is DevOps_Repo_SSH
 - Create and configure job
   - Click Dashboard -> New Item
@@ -45,28 +44,29 @@
   - So, in this case, the command will be: `docker push localhost:5000/<IMAGE_NAME>:<tag>`
 
 ## Jenkinsfile explanation: 
+- Two environment variables are used.
+  1. REGISTRY_URL: Set to `localhost:5000`
+  2. IMAGE_NAME: Set to `dev-ops-eval`
 - There are four stages in the Jenkinsfile.
-1. Checkout: Clone the repo and checkout to the main branch using the DevOps_Repo_SSH credential.
-2. Environment Setup: 
-    - REGISTRY_URL and IMAGE_NAME variables are set
-    - Run `npm install` using NodeJS installation
-3. Package:
-  - Take the latest commit sha to use as a tag of the docker image.
-  - `git rev-parse --short HEAD`
-  - Build the Docker image and use the local registry URL in the tag so that it can be pushed there.
-  - `docker build -t localhost:5000/<IMAGE_NAME>:<COMMIT_SHA> .`
-4. Deploy:
-  - Push the Docker image to the local registry running at the host machine’s port 5000.
-    - `docker push localhost:5000/<IMAGE_NAME>:<COMMIT_SHA>`
-  - Remove the local Docker built image using the below command.
-    - `docker rmi localhost:5000/<IMAGE_NAME>:<COMMIT_SHA>`
-  - Pull the image from the local registry
-    - `docker pull localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
-  - Run the pulled Docker image using the following command to ensure it is running in detached mode and maps the 8080 port to host machine's 3000 port so that it can be verified.
-    - `docker run -d -p 3000:8080 localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
-  - Sleep a little bit to ensure the express server is running with the docker container.
-  - Verify whether the server is running by invoking the below curl command and checking whether the response code is 200.
-    `curl --head --silent --write-out \"%{http_code}\" --output /dev/null \"http:\\host.docker.internal:3000\"`
+  1. Checkout: Clone the repo and checkout to the main branch using the DevOps_Repo_SSH credential.
+  2. Package:
+    - Take the latest commit sha to use as a tag of the docker image.
+      - `git rev-parse --short HEAD`
+    - Build the Docker image and use the local registry URL in the tag so that it can be pushed there.
+      - `docker build -t localhost:5000/<IMAGE_NAME>:<COMMIT_SHA> .`
+  3. Integrate:
+    - Push the Docker image to the local registry running at the host machine’s port 5000.
+      - `docker push localhost:5000/<IMAGE_NAME>:<COMMIT_SHA>`
+    - Remove the local Docker built image using the below command.
+      - `docker rmi localhost:5000/<IMAGE_NAME>:<COMMIT_SHA>`
+  4. Deploy:
+    - Pull the image from the local registry
+      - `docker pull localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
+    - Run the pulled Docker image using the following command to ensure it is running in detached mode and maps the 8080 port to host machine's 3000 port so that it can be verified.
+      - `docker run -d -p 3000:8080 localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
+    - Sleep a little bit to ensure the express server is running with the docker container.
+    - Verify whether the server is running by invoking the below curl command and checking whether the response code is 200.
+      - `curl --head --silent --write-out \"%{http_code}\" --output /dev/null \"http:\\host.docker.internal:3000\"`
 
 ## Issues faced and resolutions
 1. permission denied while trying to connect to the Docker daemon socket
