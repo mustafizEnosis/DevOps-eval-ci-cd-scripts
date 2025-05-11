@@ -10,15 +10,15 @@
 - To persist the jenkins container data, jenkins_home volume is created.
 - In order to access the host machine’s IP address, the extra_hosts key is used, and the host_gateway is mapped to host.docker.internal.
 - Two ports are mapped with the Jenkins container: 8080 and 50000
-- A local registry setup using the public registry Docker image.
+- A local registry setup using the public [registry Docker image](https://hub.docker.com/_/registry).
 - To persist the registry container data, a registry_data volume is created.
-- restart:always key is used to automatically restart the containers if they exit for any reason (except when I explicitly stopped them).
+- restart:always key is used to automatically restart the containers if they exit for any reason (except when they are explicitly stopped).
 
 ## Setup Jenkins:
-- As the Jenkins container is running, go to `http://localhost:8080` and provide the admin password found with the below command.
+- As the Jenkins container is running, go to `http://localhost:8080` and provide the admin (username) password found with the below command.
   - sudo docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 - Install the suggested plugins. Additional plugins can be installed from Manage Jenkins -> Manage plugins
-- Add GitHub SSH credential: An SSH credential for GitHub is created using this document. Then in Jenkins, go to Manage Jenkins -> Credentials -> (System) Global Domains -> Select SSH Username with private key option and fill data in the fields. Ensure the ID of the credential is DevOps_Repo_SSH
+- Add GitHub SSH credential: An SSH credential for GitHub is created using this [document](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=linux). Then in Jenkins, go to Manage Jenkins -> Credentials -> (System) Global Domains -> Select SSH Username with private key option and fill data in the fields. Ensure the ID of the credential is DevOps_Repo_SSH
 - Create and configure job
   - Click Dashboard -> New Item
   - Select Pipeline by providing a name.
@@ -33,11 +33,11 @@
       - `docker build -t localhost:5000/<IMAGE_NAME>:<tag> .`
     - Breakdown of each step in the build process/Dockerfile.
       - Docker packages up all the files and directories and sends them to the Docker daemon.
-      - The base image node:23-alpine is downloaded and is the starting point/first layer for the final image.
+      - The base image `node:23-alpine` is downloaded and is the starting point/first layer for the final image.
       - Then the package.json and package-lock.json files are copied to the /usr/src/app directory of the image.
       - A new layer is added, and the npm install command is executed to install the application packages.
       - The project folder is copied into the /usr/src/app directory of the image.
-      - Http Port 8080 is exposed, and this is the final step for building the image.
+      - Http Port 8080 is exposed.
       - Now, the entry point of the image is defined. The default command is npm start which will be executed when a container is started from this image.
 - Run the below command to push the Docker image to the registry running at port 5000.
   - `docker push <REGISTRY_URL>/<IMAGE_NAME>:<tag>`
@@ -62,9 +62,9 @@
   4. Deploy:
     - Pull the image from the local registry
       - `docker pull localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
-    - Run the pulled Docker image using the following command to ensure it is running in detached mode and maps the 8080 port to host machine's 3000 port so that it can be verified.
+    - Run the pulled Docker image using the following command to ensure it is running in detached mode and maps the 8080 port to host machine's 3000 port.
       - `docker run -d -p 3000:8080 localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
-    - Sleep a little bit to ensure the express server is running with the docker container.
+    - Sleep a little bit to ensure the express server is running within the docker container.
     - Verify whether the server is running by invoking the below curl command and checking whether the response code is 200.
       - `curl --head --silent --write-out \"%{http_code}\" --output /dev/null \"http:\\host.docker.internal:3000\"`
 
