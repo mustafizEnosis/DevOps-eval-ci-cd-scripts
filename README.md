@@ -5,7 +5,7 @@
 - Go to the docker compose file directory.
 - Run the docker compose file to run the jenkins and registry containers: `docker compose up`.
 - There are two services (Jenkins and registry) in the compose file.
-- Jenkins container needs root permissions to run Docker CLI commands. That’s why the user and privileged keys are used.
+- Jenkins container run as root user to run Docker CLI commands.
 - To share the host machine's Docker, /var/run/docker.sock and /usr/bin//docker files are mounted as volumes.
 - To persist the jenkins container data, jenkins_home volume is created.
 - In order to access the host machine’s IP address, the extra_hosts key is used, and the host_gateway is mapped to host.docker.internal.
