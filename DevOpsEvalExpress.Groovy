@@ -31,17 +31,24 @@ pipeline {
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     script {
-                        def tags = sh(script: "curl -s http://host.docker.internal:5000/v2/${IMAGE_NAME}/tags/list", returnStdout: true).trim()
-                        if (tags.contains("\"${COMMIT_SHA}\"")) {
-                            echo "Image with tag ${COMMIT_SHA} already exists in the local registry"
-                            currentBuild.result = 'FAILURE'
-                            sh 'exit 1'
-                        }
-
-                        echo "Pushing docker image to ${REGISTRY_URL}"
-                        sh "docker push ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
+                        withCredentials([usernamePassword(credentialsId: 'DOCKER_REGISTRY_CRED', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+                            sh 'docker login -u ${REGISTRY_USER} -p ${REGISTRY_PASS} ${REGISTRY_URL}'
+                            
+                            def tags = sh(script: "curl -s http://host.docker.internal:5000/v2/${IMAGE_NAME}/tags/list", returnStdout: true).trim()
+                            if (tags.contains("\"${COMMIT_SHA}\"")) {
+                                echo "Image with tag ${COMMIT_SHA} already exists in the local registry"
+                                currentBuild.result = 'FAILURE'
+                                logoutFromRegistry()
+                                sh 'exit 1'
+                            }
                         
-                        sh "docker rmi ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
+                            echo "Pushing docker image to ${REGISTRY_URL}"
+                            sh "docker push ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
+                            
+                            sh "docker rmi ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
+
+                            logoutFromRegistry()
+                        }
                     }
                 }
             }
@@ -54,9 +61,15 @@ pipeline {
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     script {
-                        echo "Pulling docker image from ${REGISTRY_URL}"
-                        sh "docker pull ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
+                        withCredentials([usernamePassword(credentialsId: 'DOCKER_REGISTRY_CRED', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+                            sh 'docker login -u ${REGISTRY_USER} -p ${REGISTRY_PASS} ${REGISTRY_URL}'
+                            
+                            echo "Pulling docker image from ${REGISTRY_URL}"
+                            sh "docker pull ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
 
+                            logoutFromRegistry()
+                        }
+                        
                         def container_id = sh(script: "docker ps --filter \"publish=3000\" --format \"{{.ID}}\"", returnStdout: true).trim()
                         if (container_id) {
                             echo "Stopping existing container: ${container_id}"
@@ -84,4 +97,8 @@ pipeline {
             }
         }     
     }
+}
+
+def logoutFromRegistry() {
+    sh "docker logout ${env.REGISTRY_URL}"
 }
