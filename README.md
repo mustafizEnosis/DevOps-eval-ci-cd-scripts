@@ -1,7 +1,7 @@
 ## Prerequisites:
 - Install Docker Engine on the host machine. Please follow this [document](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository) to install Docker on the Linux host machine.
 
-## Describing docker-compose.yml:
+## Describing docker-compose.yaml:
 - Go to the docker compose file directory.
 - Run the docker compose file to run the jenkins and registry containers: `docker compose up`.
 - There are two services (Jenkins and registry) in the compose file.
