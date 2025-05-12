@@ -60,8 +60,11 @@
     - Remove the local Docker built image using the below command.
       - `docker rmi localhost:5000/<IMAGE_NAME>:<COMMIT_SHA>`
   4. Deploy:
-    - Pull the image from the local registry
+    - Pull the image from the local registry.
       - `docker pull localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
+    - Get the container ID of the currently deployed one and stop that.
+      - `def container_id = sh(script: "docker ps --filter \"publish=3000\" --format \"{{.ID}}\"", returnStdout: true).trim()`
+      - `docker stop ${container_id}`    
     - Run the pulled Docker image using the following command to ensure it is running in detached mode and maps the 8080 port to host machine's 3000 port.
       - `docker run -d -p 3000:8080 localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
     - Sleep a little bit to ensure the express server is running within the docker container.
@@ -69,16 +72,40 @@
       - `curl --head --silent --write-out \"%{http_code}\" --output /dev/null \"http:\\host.docker.internal:3000\"`
 
 ## Issues faced and resolutions
-1. permission denied while trying to connect to the Docker daemon socket
-  - Add your user to the docker group and restart the machine
+Issue #1. Docker Daemon Socket Permission Denied
+- Problem: permission denied while trying to connect to the Docker daemon socket
+- Resolution: Needed to add user to the docker group and restart the machine
     - `sudo usermod -aG docker $USER`
-2. You're using 'Known hosts file' strategy to verify ssh host keys, but your known_hosts file does not exist, please go to 'Manage Jenkins' -> 'Security' -> 'Git Host Key Verification Configuration' and configure host key verification.
-  - Go to Manage Jenkins -> Security. Scroll down to Git Host Key Verification Configuration and select Manually Provided Keys options. In the approved host keys, select github public key.
-3. At first, I thought of using the Docker network to keep the Jenkins container and the registry container on the same network. Then, utilize the registry container name to push/pull and access the local registry. However, I was getting the following error: Get "http://local-registry:5000/v2/": dial tcp: lookup local-registry: Temporary failure in name resolution
-  - The GET request of `http://local-registry:5000/v2/` is invoked by the docker push command internally. As we are sharing the host Docker within the Jenkins container, the host machine is unable to resolve the local-registry container name.
-  - I didn’t want to create an entry in the host machine to resolve the local-registry to the localhost or its IP address. Because this will lead to an extra step for maintenance.
-  - That’s why I decided to use localhost as a registry URL. Since the local registry container and the Jenkins container are running on the same host and the registry container is mapped with the host machine on the 5000 port, we can access the local registry using the `localhost:5000` URL without adding any extra step for maintenance.
-4. To verify whether the deployment is successful, I wanted to use the URL http://localhost:3000, but it was refusing the connection.
-  - Doing curl on `http://localhost:3000` would actually request the Jenkins container port 3000. However, we ran the Docker image using the docker run command. Since we share the Docker daemon of the host machine, the run command actually mapped the host machine’s port 3000 to the 8080 port of the image. Thus, we need a mechanism to get the host machine’s IP address from the Jenkins container to know whether the deployment is successful or the Docker image is running.
-  - In order to access the host machine’s IP address, the extra_hosts key is used in the docker compose under the Jenkins service, and the host_gateway is mapped to host.docker.internal. With host-gateway keyword docker dynamically resolves to the IP address of the gateway of the Docker bridge network on the host machine.
-  - Thus, we should curl to http://host.docker.internal:3000 to check whether the deployment is successful.
+
+Issue #2. Missing 'Known Hosts File' for SSH Host Key Verification in Jenkins
+- Problem: You're using 'Known hosts file' strategy to verify ssh host keys, but your known_hosts file does not exist, please go to 'Manage Jenkins' -> 'Security' -> 'Git Host Key Verification Configuration' and configure host key verification.
+- Resolution: Navigated to 'Manage Jenkins' -> 'Security' -> 'Git Host Key Verification Configuration' and selected the "Manually Provided Keys" option. Then, added the GitHub public key to the approved host keys.
+
+Issue #3. Local Docker Registry Access Issues within Jenkins Container
+- Problem: Initially attempted to use the Docker network to connect the Jenkins and registry containers, intending to use the registry container name (`local-registry`) to push/pull images. This resulted in a DNS resolution error: `Get "http://local-registry:5000/v2/": dial tcp: lookup local-registry: Temporary failure in name resolution`. This occurred because the host Docker is shared, and the host machine couldn't resolve the container name.
+- Reasoning against Host Machine Entry: Avoided adding an entry in the host machine's DNS to resolve `local-registry` to localhost or its IP address due to the added maintenance overhead.
+- Resolution: Utilized `localhost` as the registry URL. Since both containers reside on the same host, and port 5000 on the host is mapped to the registry container, accessing `localhost:5000` from the jenkins container works without extra configuration.
+
+Issue #4: Difficulty Verifying Deployment via `http://localhost:3000`
+- Problem: To verify whether the deployment is successful, I wanted to use the URL http://localhost:3000 through curl from the pipeline script, but it was refusing the connection.
+- Explanation: Executing `curl http://localhost:3000` from within the Jenkins container resolves to the container's own localhost, not the host machine's. The Docker `run` command had mapped the host's port 3000 to the image's 8080 port, meaning the application wasn't running on the Jenkins container's port 3000.
+- Solution: Added the `extra_hosts` key in the Docker Compose file under the Jenkins service, mapping `host.docker.internal` to the host gateway. The `host-gateway` keyword dynamically resolves to the host machine's Docker bridge network gateway IP. This allows verification of the deployment by curling `http://host.docker.internal:3000)`.
+
+## Set up automatic build trigger
+- Configure Jenkins job
+  - Select Pipeline script from SCM.
+  - Choose Git as the SCM.
+  - Enter your GitHub repository URL.
+  - Specify the Branch Specifier (*/main).   
+  - Save the job configuration.
+- Install ngrok in the host server machine. Follow this [document](https://ngrok.com/docs/getting-started/?os=linux) to install ngrok.
+- Configure the GitHub Webhook
+  - Go to your GitHub repository.
+  - Click on the Settings tab.
+  - In the left sidebar, click on Webhooks.
+  - Click on the Add webhook button.
+  - Payload URL: Enter your Jenkins server's URL (ngrok public URL setup for the jenkins container) followed by /github-webhook/. For example: https://cosmic-puma-hopeful.ngrok-free.app/github-webhook/
+  - Content type: Choose application/json.
+  - Which events would you like to trigger this webhook? Choose "Just push events".
+  - Ensure the Active checkbox is selected.
+  - Click on the Add webhook button.
