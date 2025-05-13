@@ -23,9 +23,9 @@
 - Add the following 3 environment variables with the registry service.
   1. REGISTRY_AUTH=htpasswd
   2. REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm
-  3. REGISTRY_AUTH_HTPASSWD_PATH=/<Path-to>/htpasswd
+  3. REGISTRY_AUTH_HTPASSWD_PATH=/Path/to/htpasswd
 - Add the following volume with the registry service.
-  - ./<Path-to-htpasswd>:/auth
+  - ./Path/to:/auth
 
 ## Setup Jenkins:
 - As the Jenkins container is running, go to `http://localhost:8080` and provide the admin (username) password found with the below command.
