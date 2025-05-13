@@ -34,7 +34,7 @@ pipeline {
                         withCredentials([usernamePassword(credentialsId: 'DOCKER_REGISTRY_CRED', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
                             sh 'docker login -u ${REGISTRY_USER} -p ${REGISTRY_PASS} ${REGISTRY_URL}'
                             
-                            def tags = sh(script: "curl -s http://host.docker.internal:5000/v2/${IMAGE_NAME}/tags/list", returnStdout: true).trim()
+                            def tags = sh(script: "curl --cacert /mnt/certs/registry.crt -s https://host.docker.internal:5000/v2/${IMAGE_NAME}/tags/list", returnStdout: true).trim()
                             if (tags.contains("\"${COMMIT_SHA}\"")) {
                                 echo "Image with tag ${COMMIT_SHA} already exists in the local registry"
                                 currentBuild.result = 'FAILURE'

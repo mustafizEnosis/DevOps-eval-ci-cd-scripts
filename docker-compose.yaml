@@ -7,6 +7,9 @@ services:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
+      - type: bind
+        source: ./certs/
+        target: /mnt/certs/
     ports:
       - "8080:8080"
       - "50000:50000"
