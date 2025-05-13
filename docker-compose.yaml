@@ -2,7 +2,6 @@ services:
   jenkins:
     image: jenkins/jenkins:lts-jdk17
     container_name: jenkins
-    privileged: true
     user: root
     volumes:
       - jenkins_home:/var/jenkins_home
@@ -20,15 +19,19 @@ services:
   registry:
     image: registry:2
     container_name: local-registry
+    environment:
+      - REGISTRY_AUTH=htpasswd
+      - REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm
+      - REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
+      - REGISTRY_HTTP_ADDR=0.0.0.0:443
+      - REGISTRY_HTTP_TLS_CERTIFICATE=/certs/registry.crt
+      - REGISTRY_HTTP_TLS_KEY=/certs/registry.key
     volumes:
       - registry_data:/var/lib/registry
+      - ./auth:/auth
       - ./certs:/certs
     ports:
       - "5000:443"
-    environment:
-      REGISTRY_HTTP_ADDR: "0.0.0.0:443"
-      REGISTRY_HTTP_TLS_CERTIFICATE: "/certs/registry.crt"
-      REGISTRY_HTTP_TLS_KEY: "/certs/registry.key"
     restart: always
 
 volumes:
