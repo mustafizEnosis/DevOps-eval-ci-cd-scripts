@@ -14,11 +14,26 @@
 - To persist the registry container data, a registry_data volume is created.
 - restart:always key is used to automatically restart the containers if they exit for any reason (except when they are explicitly stopped).
 
+## Setup local registry authentication:
+- Install htpasswd
+  - `sudo apt install apache2-utils`
+- Create a new htpasswd file and add the username
+  - sudo htpasswd -c /path/to/.htpasswd <username>
+- You'll be prompted to enter and confirm the password for the user. Remember the password for creating credential in Jenkins.
+- Add the following 3 environment variables with the registry service.
+  1. REGISTRY_AUTH=htpasswd
+  2. REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm
+  3. REGISTRY_AUTH_HTPASSWD_PATH=/<Path-to>/htpasswd
+- Add the following volume with the registry service.
+  - ./<Path-to-htpasswd>:/auth
+
 ## Setup Jenkins:
 - As the Jenkins container is running, go to `http://localhost:8080` and provide the admin (username) password found with the below command.
   - sudo docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 - Install the suggested plugins. Additional plugins can be installed from Manage Jenkins -> Manage plugins
-- Add GitHub SSH credential: An SSH credential for GitHub is created using this [document](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=linux). Then in Jenkins, go to Manage Jenkins -> Credentials -> (System) Global Domains -> Select SSH Username with private key option and fill data in the fields. Ensure the ID of the credential is DevOps_Repo_SSH
+- Add credentials: Navigate to Manage Jenkins -> Credentials -> (System) Global Domains -> 
+  - GitHub SSH credential: An SSH credential for GitHub is created using this [document](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=linux). Select SSH Username with private key option and fill data in the fields. Ensure the ID of the credential is DevOps_Repo_SSH
+  - Local registry login credential: Select Username with password. In the username field, provide the username used while creating the htpasswd file. Then in the password field, provide the password. Ensure the ID of the credential is DOCKER_REGISTRY_CRED.
 - Create and configure job
   - Click Dashboard -> New Item
   - Select Pipeline by providing a name.
@@ -55,13 +70,20 @@
     - Build the Docker image and use the local registry URL in the tag so that it can be pushed there.
       - `docker build -t localhost:5000/<IMAGE_NAME>:<COMMIT_SHA> .`
   3. Integrate:
+    - Utilize `withCredentials` to get the username and password of the DOCKER_REGISTRY_CRED credential.
+      - Log in to the docker registry: `docker login -u ${REGISTRY_USER} -p ${REGISTRY_PASS} ${REGISTRY_URL}`
     - Push the Docker image to the local registry running at the host machine’s port 5000.
       - `docker push localhost:5000/<IMAGE_NAME>:<COMMIT_SHA>`
     - Remove the local Docker built image using the below command.
       - `docker rmi localhost:5000/<IMAGE_NAME>:<COMMIT_SHA>`
+    - Log out from the docker registry: `docker logout ${env.REGISTRY_URL}`
   4. Deploy:
+    - Execute this stage if no failure is occurred priorly.
+    - Utilize `withCredentials` to get the username and password of the DOCKER_REGISTRY_CRED credential.
+      - Log in to the docker registry: `docker login -u ${REGISTRY_USER} -p ${REGISTRY_PASS} ${REGISTRY_URL}`
     - Pull the image from the local registry.
       - `docker pull localhost:5000/${IMAGE_NAME}:${COMMIT_SHA}`
+    - Log out from the docker registry: `docker logout ${env.REGISTRY_URL}`
     - Get the container ID of the currently deployed one and stop that.
       - `def container_id = sh(script: "docker ps --filter \"publish=3000\" --format \"{{.ID}}\"", returnStdout: true).trim()`
       - `docker stop ${container_id}`    
