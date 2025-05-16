@@ -18,12 +18,12 @@
 - Install htpasswd
   - `sudo apt install apache2-utils`
 - Create a new htpasswd file and add the username
-  - sudo htpasswd -c /path/to/.htpasswd <username>
+  - `sudo htpasswd -c /path/to/.htpasswd <username>`
 - You'll be prompted to enter and confirm the password for the user. Remember the password for creating credential in Jenkins.
 - Add the following 3 environment variables with the registry service.
-  1. REGISTRY_AUTH=htpasswd
-  2. REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm
-  3. REGISTRY_AUTH_HTPASSWD_PATH=/Path/to/htpasswd
+  1. `REGISTRY_AUTH=htpasswd`
+  2. `REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm`
+  3. `REGISTRY_AUTH_HTPASSWD_PATH=/Path/to/htpasswd`
 - Add the following volume with the registry service.
   - ./Path/to:/auth
 
