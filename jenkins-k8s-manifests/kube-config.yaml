@@ -1,0 +1,18 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: <certificate-authority-data>
+    server: <cluster-api-server-url>
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: jenkins-sa
+  name: jenkins-sa@kubernetes
+current-context: jenkins-sa@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: jenkins-sa
+  user:
+    token: <jenkins-sa-token>
