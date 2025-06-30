@@ -4,7 +4,7 @@ pipeline {
     agent any
     
     environment {
-        REGISTRY_URL = 'localhost:5000'
+        REGISTRY_USER = 'mustafizur996'
         IMAGE_NAME = 'dev-ops-eval'
         KUBECONFIG_PATH = '/home/jenkins/.kube/config'
     }
@@ -22,8 +22,8 @@ pipeline {
                 script {
                     echo "Building docker image"
                     COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    echo "${REGISTRY_URL}"
-                    sh "docker build -t ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA} ."
+                    echo "${REGISTRY_USER}"
+                    docker.build("${REGISTRY_USER}/${IMAGE_NAME}:${COMMIT_SHA}", ".")
                 }
             }
         }
@@ -32,21 +32,17 @@ pipeline {
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     script {
-                        withCredentials([usernamePassword(credentialsId: 'DOCKER_REGISTRY_CRED', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
-                            sh 'docker login -u ${REGISTRY_USER} -p ${REGISTRY_PASS} ${REGISTRY_URL}'
-                            
-                            def tags = sh(script: "curl -s http://host.docker.internal:5000/v2/${IMAGE_NAME}/tags/list", returnStdout: true).trim()
-                            if (tags.contains("\"${COMMIT_SHA}\"")) {
-                                echo "Image with tag ${COMMIT_SHA} already exists in the local registry"
-                                currentBuild.result = 'FAILURE'
-                                logoutFromRegistry()
-                                sh 'exit 1'
-                            }
-                        
-                            echo "Pushing docker image to ${REGISTRY_URL}"
-                            sh "docker push ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
-
-                            logoutFromRegistry()
+                        docker.withRegistry('https://index.docker.io/v1/', 'DOCKERHUB_REGISTRY_CRED') {
+                            // def tags = sh(script: "curl -s https://hub.docker.com/v2/namespaces/${REGISTRY_USER}/repositories/${IMAGE_NAME}/tags/", returnStdout: true).trim()
+                            // echo "Available tags in the repo: ${tags}"
+                            // if (tags.contains("\"${COMMIT_SHA}\"")) {
+                            //     echo "Image with tag ${COMMIT_SHA} already exists in the local registry"
+                            //     currentBuild.result = 'FAILURE'
+                            //     sh 'exit 1'
+                            // }
+                            echo "Pushing docker image with tag ${COMMIT_SHA}"
+                            def dockerImage = docker.image("${REGISTRY_USER}/${IMAGE_NAME}:${COMMIT_SHA}")
+                            dockerImage.push()
                         }
                     }
                 }
@@ -61,13 +57,14 @@ pipeline {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     script {
                         withEnv(["KUBECONFIG=${env.KUBECONFIG_PATH}"]) {
-                            withCredentials([usernamePassword(credentialsId: 'DOCKER_REGISTRY_CRED', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
-                                sh 'kubectl create secret docker-registry regcred --docker-server=${REGISTRY_URL} --docker-username=${REGISTRY_USER} --docker-password=${REGISTRY_PASS}'
+                            withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_REGISTRY_CRED', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+                                sh 'kubectl create secret docker-registry regcred --docker-server=https://index.docker.io/v1/ --docker-username=${REGISTRY_USER} --docker-password=${REGISTRY_PASS}'
                             }
 
                             sh "kubectl apply -f k8s-manifests/"
-                            sh "kubectl set image deployment/sample-nodejs nodejs-container=${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA} --record"
+                            sh "kubectl set image deployment/sample-nodejs nodejs-container=${REGISTRY_USER}/${IMAGE_NAME}:${COMMIT_SHA} --record"
 
+                            sh "kubectl rollout status deployment/sample-nodejs --timeout=3m"
                             sleep 3
     
                             def deployed_url = "http://host.docker.internal:30080"
@@ -92,7 +89,7 @@ pipeline {
             steps {
                 script {
                     echo "Cleaning up resources"
-                    sh "docker rmi ${REGISTRY_URL}/${IMAGE_NAME}:${COMMIT_SHA}"
+                    sh "docker rmi ${REGISTRY_USER}/${IMAGE_NAME}:${COMMIT_SHA}"
 
                     withEnv(["KUBECONFIG=${env.KUBECONFIG_PATH}"]) {
                             sh "kubectl delete secret regcred"
@@ -101,8 +98,4 @@ pipeline {
             }
         }     
     }
-}
-
-def logoutFromRegistry() {
-    sh "docker logout ${env.REGISTRY_URL}"
 }
